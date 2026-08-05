@@ -10,29 +10,26 @@ async function register(full_name, email, password) {
 
     if (error) throw error;
 
-    // Insert profile
+    // Insert into public.users
     const { data: profile, error: profileError } = await supabase
-        .from("profiles")
+        .from("users")
         .insert({
             id: data.user.id,
             full_name,
-            role: "staff",
+            email,
+            role: "STAFF",
+            is_active: true,
         })
         .select()
         .single();
 
-    if (profileError) {
-        console.error("PROFILE ERROR:", profileError);
-        throw profileError;
-    }
+    if (profileError) throw profileError;
 
-    return {
-        user: data.user,
-        profile,
-    };
+    return profile;
 }
 
 async function login(email, password) {
+    // Login using Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -40,7 +37,30 @@ async function login(email, password) {
 
     if (error) throw error;
 
-    return data;
+    console.log("=================================");
+    console.log("AUTH USER ID:", data.user.id);
+    console.log("AUTH EMAIL:", data.user.email);
+
+    // Fetch user from public.users
+    const { data: users, error: dbError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", data.user.id);
+
+    console.log("PUBLIC USERS:", users);
+    console.log("DB ERROR:", dbError);
+    console.log("=================================");
+
+    if (dbError) throw dbError;
+
+    if (!users || users.length === 0) {
+        throw new Error("User not found in public.users");
+    }
+
+    return {
+        session: data.session,
+        user: users[0],
+    };
 }
 
 module.exports = {
